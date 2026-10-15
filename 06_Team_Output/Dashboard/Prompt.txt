@@ -92,6 +92,7 @@ Language: Ensure all system text, map legends, tooltips, and dashboard metrics a
 
 #github copilot(최종 대시보드)
 
+(최종 데이터로 교체 및 대시보드 생성)
 Replace the mock data and maps in the existing Incheon elderly medical vulnerability dashboard with the attached final datasets. Update the existing project using its React/TypeScript/Vite, Tailwind, Leaflet, Recharts stack and visual design. Do not create a separate project. Copy the files under public/data in the attached ZIP into the project's public/data directory and implement all requirements below.
 
 IMPORTANT: Keep all dashboard labels, explanations, tooltips, and other user-facing text in Korean. Section 9 contains the user's final analytical definitions and takes precedence over earlier sections wherever they conflict.
@@ -206,3 +207,171 @@ The TXT files contain original GeoJSON, not prose. Save their complete contents 
 dong_boundary_geojson.txt -> public/data/dong_boundary.geojson
 facilities_geojson.txt -> public/data/facilities.geojson
 Do not summarize, truncate, alter, or generate replacements. Parse the saved files as JSON and use them as the actual map layers.
+
+
+
+(지도 색깔 변경 및 페르소나 추가)
+# Role & Task Objective
+
+You are an expert GIS Data Analyst and Frontend/Data Visualization Developer.
+Write a complete, modular, and maintainable dashboard implementation (using Python/Streamlit with Folium/Deck.gl or React with Mapbox/Deck.gl) that visualizes aging trends, healthcare accessibility, and 2031 scenario predictions for Incheon's administrative dongs (행정동).
+
+Use the following input datasets:
+
+1. `dong_master.csv`
+2. `dong_boundary.gpkg`
+3. `policy_matrix.csv`
+
+---
+
+## Technical & Global Styling Rules
+
+### Global Theme & Color Uniformity
+
+- **Theme Mode:** High-contrast, clean **Light Mode**.
+- **Color Scheme Uniformity Across All Years (2016, 2021, 2026, 2031):**
+    - **CRITICAL:** All map visual steps (2016, 2021, 2026, 2031) on the Executive Summary (종합 현황) time slider **MUST use the exact same fixed color scale normalized against the 2026 baseline state**. Do not dynamically recalculate quantile/min-max bounds per year.
+    - **Vulnerable Dongs (`vuln` != "비취약"):** Red (`#E74C3C` or `#D32F2F`)
+    - **Borderline / At-Risk Dongs:** Orange (`#F39C12` or `#E67E22`)
+    - **Non-Vulnerable Dongs (`vuln` == "비취약"):** Green (`#2ECC71` or `#27AE60`)
+
+---
+
+## Feature Implementation Details
+
+### 1. Executive Summary & Time Slider (종합 현황)
+
+- Provide an interactive **Time Slider** covering steps: `2016 → 2021 → 2026 → 2031 (Scenario)`.
+- Selecting a year dynamically updates the map view, KPI cards, and district-level statistics.
+- Ensure map legends and polygon colors strictly enforce the uniform color mapping (Vulnerable = Red, Borderline = Orange, Non-Vulnerable = Green) based on the 2026 baseline across all slider positions.
+
+---
+
+### 2. Typology Personas Section: Slide / Carousel Component (유형별 페르소나)
+
+Implement an interactive **Slide / Carousel Component** (or Tab-based slider) in the "Current State (2026)" section. Store all persona data in a standalone, highly editable data structure (Python `dict` / `list` or JS `Array`) so the user can easily modify or replace persona content later.
+
+#### Modifiable Persona Data Structure Example:
+
+```python
+PERSONA_DATA = [
+    {
+        "id": "vulnerable_transit_medical",
+        "type_title": "의료교통 동시 취약형 (걸어서도 버스로도 불리)",
+        "name": "김순자 할머니",
+        "age": 82,
+        "location": "강화도 외곽 면 지역 (강화군 교동면)",
+        "quote": "마을에 병원은커녕 약국도 없어요. 버스 한번 타려면 한참 걸어 나가야 하고, 응급실 가려면 배나 차 타고 40분 넘게 나가야 하니 아파도 꾹 참게 됩니다.",
+        "challenges": [
+            "반경 10km 이내 일차 의료기관(의원/병원) 부재",
+            "최단 거리 응급실까지 이동 시간 40분 이상 소요",
+            "마을 버스 배차 간격이 길고 버스정류장까지 도보 접근성 불량",
+            "월 1회 찾아오는 방문 진료/간호 서비스에 전적으로 의존"
+        ]
+    },
+    {
+        "id": "elderly_single_dense",
+        "type_title": "고령 1인가구 밀집형 (같이 갈 가족 없음)",
+        "name": "이성호 할아버지",
+        "age": 79,
+        "location": "원도심 노후 주거지 (동구 화수2동)",
+        "quote": "동네에 병원은 몇 군데 있지만, 혼자 살다 보니 자식들 눈치 보여 연락도 못 하고 동행해 줄 사람이 없어요. 무릎이 아파 버스 계단 오르내리는 것도 큰 일입니다.",
+        "challenges": [
+            "혼자 거주하는 고령 1인 가구로 병원 방문 시 동행자 미확보",
+            "관절염 등 만성질환을 겪고 있으나 이동 보조 수단 부족",
+            "정보 접근성 부족으로 복지 간병/동행 서비스 신청에 어려움",
+            "거주지 주변 계단 및 경사로가 많아 도보 이동 제한"
+        ]
+    },
+    {
+        "id": "average_type",
+        "type_title": "평균형 (걸어갈 병원 없고 버스는 가까움)",
+        "name": "박정숙 할머니",
+        "age": 76,
+        "location": "원도심 외곽 주거지 (남동구 만수2동)",
+        "quote": "집 근처에 걸어갈 수 있는 병원은 없지만, 집 앞 정류장에서 버스를 타면 15~20분 내로 시내 병원에 갈 수 있어요. 다만 배차 시간이 긴 편이라 기다리기 다소 지칩니다.",
+        "challenges": [
+            "도보 600m 이내 생활권 내 의원급 의료기관 부재",
+            "대중교통(버스) 버퍼 내 위치하여 이동은 가능하나 환승 필요",
+            "환절기나 야간/주말 의료 이용 시 접근성 저하",
+            "만성질환 관리 및 약 처방을 위해 정기적 버스 이동 필수"
+        ]
+    },
+    {
+        "id": "island_type",
+        "type_title": "도서형 (배로 육지 병원에 감)",
+        "name": "정학철 할아버지",
+        "age": 84,
+        "location": "외곽 도서 지역 (옹진군 덕적면)",
+        "quote": "육지 병원에 한번 가려면 아침 일찍 배를 타고 나가야 해요. 기상이 악화되어 배가 뜨지 않으면 진료나 약 처방을 받을 방법이 전혀 없습니다.",
+        "challenges": [
+            "섬 지역 특성상 해상 교통(여객선) 의존도 100%",
+            "기상 악화(풍랑주의보, 안개 등) 시 육지 대형병원 이동 전면 통제",
+            "도서 보건지소 외 진료과목별 전문의 및 정밀 검사 장비 부족",
+            "응급 상황 발생 시 헬기 이송 등 특수 응급 체계에만 의존"
+        ]
+    }
+]
+```
+
+
+
+(지도 행정동명 및 수치 표기)
+# UI & GIS Map Feature Request: Adaptive Text Labels for Dong Names and Aging Ratios
+
+Please implement dynamic SVG/Canvas or GeoJSON layer text labels that display each Dong's Name (`adm_nm`) and Aging Ratio (`eld_ratio`) directly over its polygon feature, automatically scaling text size and line breaks based on the polygon's spatial area.
+
+---
+
+## Technical & Spatial Specifications
+
+### 1. Dynamic Text Label Calculation Rules
+- **Text Content:** Display the Administrative Dong Name (`adm_nm`) and its corresponding Aging Ratio formatted to one decimal place (e.g., `화수2동\n(28.4%)`).
+- **Polygon Area Bounds Calculation:**
+  - Calculate the bounding box area or spatial extent (using Turf.js or GIS centroid/bbox utilities) for each feature in `dong_boundary.geojson`.
+  - Classify polygon sizes into dynamic scale buckets (e.g., Small, Medium, Large island/rural dongs).
+
+### 2. Adaptive Font Sizing & Multi-line Wrapping
+- **Dynamic Font Size (`fontSize`):**
+  - Set font sizes proportional to the log/linear scale of the polygon area and current map zoom level.
+  - **Large Polygons (e.g., Ganghwa/Ongjin rural dongs):** Render prominent labels ($14\text{px} \sim 18\text{px}$).
+  - **Medium Polygons (standard urban dongs):** Render medium labels ($10\text{px} \sim 13\text{px}$).
+  - **Small Polygons (dense inner-city dongs):** Render compact labels ($7\text{px} \sim 9\text{px}$) with automatic multi-line wrapping to prevent text overflowing adjacent boundaries.
+- **Occlusion & Collision Handling:**
+  - Automatically hide or truncate text labels on extremely small polygons at low zoom levels to prevent visual clutter, revealing them smoothly upon zooming in.
+
+### 3. Styling & High-Contrast Typography (Light Mode Support)
+- **Text Color & Halo:** Use bold dark text (`#2C3E50`) with a thin white stroke/halo (`text-halo-color: #FFFFFF`, `text-halo-width: 1.5px`) to ensure crisp readability over both Green (non-vulnerable) and Red/Orange (vulnerable) choropleth fills.
+- **Centroid Placement:** Position text anchored precisely at the inner visual center (`polylabel` or feature centroid) of each polygon.
+
+---
+
+## Code Delivery Requirements
+- Provide modular, production-ready React/JS/Python code compatible with the current map rendering pipeline (Deck.gl `TextLayer`, Leaflet `divIcon`, or Mapbox `symbol` layer).
+- Ensure smooth responsiveness when toggling time steps or zooming the map view.
+
+
+
+(지도 그라데이션)
+# GIS Visualization Feature Request: Continuous Spatial Gradient / Heatmap Layer
+
+Please update the map rendering logic to replace the discrete, polygon-bounded choropleth fill with a smooth, continuous spatial gradient (Heatmap / Interpolated Raster) across the map features.
+
+---
+
+## Technical Specifications & Implementation Guidelines
+
+1. **Continuous Spatial Interpolation (Gradation Layer):**
+   - Instead of applying flat fill colors inside discrete administrative dong boundaries (`dong_boundary.geojson`), generate a smooth spatial gradient across the region using either:
+     - **Option A (Deck.gl / Mapbox):** A `HeatmapLayer` or `GridLayer` / `HexagonLayer` configured with high smoothing/blur radius and weight derived from aging ratio or vulnerability metrics (`eld_ratio` or `acc_600`).
+     - **Option B (Leaflet):** A `leaflet-heatmap` (Heatmap.js plugin) or Inverse Distance Weighting (IDW) interpolation canvas layer centered at dong centroids (`polylabel` or feature centroids).
+
+2. **Color Palette & Gradient Normalization:**
+   - Map the continuous values seamlessly across the fixed color spectrum (Light Mode friendly):
+     - **Low / Non-Vulnerable:** Green (`#2ECC71` / `#27AE60`)
+     - **Mid-range / At-Risk:** Yellow / Orange (`#F1C40F` / `#E67E22`)
+     - **High / Vulnerable:** Red (`#E74C3C` / `#D32F2F`)
+   - **Baseline Lock:** Maintain consistent gradient thresholds anchored to the 2026 baseline state across all time slider steps (`2016 → 2021 → 2026 → 2031`).
+
+3. **Boundary Outline Overlay:**
+   - Render thin, subtle stroke outlines (`stroke: true`, `color: #CBD5E1`, `weight: 0.8px`, `fill: false`) for `dong_boundary.geojson` over the gradient heatmap layer so users can still identify administrative dong borders without snapping fill colors directly to those edges.
